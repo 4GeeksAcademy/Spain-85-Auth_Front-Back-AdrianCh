@@ -3,73 +3,100 @@ const getState = ({ getStore, getActions, setStore }) => {
 		store: {
 			message: null,
 			auth: false,
-			demo: [
-				{
-					title: "FIRST",
-					background: "white",
-					initial: "white"
-				},
-				{
-					title: "SECOND",
-					background: "white",
-					initial: "white"
-				}
-			]
+			loggedUser: "",
 		},
 		actions: {
 			// Use getActions to call a function within a fuction
-			login: async (email, password) => {
-
-
-				const myHeaders = new Headers();
-				myHeaders.append("Content-Type", "application/json");
-
-				const raw = JSON.stringify({
-					"email": email,
-					"password": password
-				});
-
-				const requestOptions = {
-					method: "POST",
-					headers: myHeaders,
-					body: raw,
-					redirect: "follow"
-				};
-
+			signup: async function signup(email, password) {
 				try {
-					const response = await fetch("https://potential-spork-7pvx7qxxxj9c64x-3001.app.github.dev/api/login", requestOptions);
-					const result = await response.json();
+					let response = await fetch('https://didactic-goldfish-pj7xw9v9x55gf9wpq-3001.app.github.dev/api/signup', {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json"
+						},
+						body: JSON.stringify({
+							"email": email,
+							"password": password
+						})
+					})
+					let data = await response.json();
+					return data
 
-					if (response.status === 200) {
-						localStorage.setItem("token", result.access_token)
-						return true
-					}
 				} catch (error) {
-					console.error(error);
-					return false;
-				};
+					return
+				}
+			},
+			login: async (email, password) => {
+				try {
+					let response = await fetch('https://didactic-goldfish-pj7xw9v9x55gf9wpq-3001.app.github.dev/api/login', {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json"
+						},
+						body: JSON.stringify({
+							"email": email,
+							"password": password
+						})
+					})
+					let data = await response.json();
+					if (response.status === 200) {
+						let token = data.access_token;
+						localStorage.setItem("token", token);
+						let actions = getActions();
+						actions.getProfile();
+						return response;
+					}
+					return data;
+				} catch (error) {
+					return;
+				}
 			},
 			getProfile: async () => {
 				let token = localStorage.getItem("token")
 				try {
-					const response = await fetch("https://potential-spork-7pvx7qxxxj9c64x-3001.app.github.dev/api/profile", {
+					const response = await fetch("https://didactic-goldfish-pj7xw9v9x55gf9wpq-3001.app.github.dev/api/profile", {
 						method: "GET",
 						headers: {
 							"Authorization": `Bearer ${token}`
 						},
 					});
-					const result = await response.json();
-					console.log(result)
+					const data = await response.json();
+					const store = getStore();
+					setStore({ ...store, loggedUser: data.logged_in_as, auth: true })
+					return;
 				} catch (error) {
 					console.error(error);
 				};
 			},
-			tokenVerify:()=>{
+			tokenVerify: async () => {
 				//crear un nuevo endpoint que se llame verificacion de token
 				//la peticion en la funcion tokenVerify del front deberia actualizar un estado auth:
+				let token = localStorage.getItem("token");
+				const store = getStore();
+				const actions = getActions();
+				try {
+					let response = await fetch('https://didactic-goldfish-pj7xw9v9x55gf9wpq-3001.app.github.dev/api/token-verify', {
+						method: "GET",
+						headers: {
+							"Authorization": `Bearer ${token}`
+						},
+					})
+					if (response.status === 200) {
+						setStore({ ...store, auth: true })
+						actions.getProfile()
+						return true;
+					}
+					setStore({ ...store, auth: false });
+					return false;
+				} catch (error) {
+					return
+				}
 			},
-			logout:()=>{
+			logout: () => {
 				//borrar el token del localStorage
+				const store = getStore();
+				setStore({ ...store, loggedUser: "", auth: false })
+				localStorage.removeItem("token");
 			},
 			getMessage: async () => {
 				try {
@@ -80,7 +107,6 @@ const getState = ({ getStore, getActions, setStore }) => {
 					// don't forget to return something, that is how the async resolves
 					return data;
 				} catch (error) {
-					console.log("Error loading message from backend", error)
 				}
 			},
 			changeColor: (index, color) => {
